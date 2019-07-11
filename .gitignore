@@ -1,6 +1,6 @@
 .DS_Store
 .cache
 .ipynb_checkpoints/
-ANALYSIS/*
-DATA/*
+ANALYSIS/*.ipynb
+DATA/
 MODULES/.DS_STORE

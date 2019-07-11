@@ -30,7 +30,7 @@ def tf_record_iterator(filename: str,
                        max_sequence_length: int = 40,
                        pad: bool = True,
                        eos_token: bool = True,
-                       **kwargs) -> tf.iterator:
+                       **kwargs) -> 'iter':
     """
     this produces ONE record only; it does not produce batches
     first and foremost;
@@ -115,14 +115,21 @@ def tf_record_batch_iterator(filename: str,
         lambda x: x.batch(batch_size))
 
     # now shift it by 3 ??
-    #dataset = dataset.map(lambda x: x[:3])
+    # THIS IS VERY IMPORTANT :: THIS BATCHES THE DATA TO A BATCH WITH THE SUBTENSORS OF SIZE 3
+    dataset = dataset.batch(batch_size).map(lambda x: x[:3])
 
     if time_major:
         # before we had ??
         # maybe before we had
-        #dataset = dataset.map(lambda x: tf.transpose(x, perm=[0, 2, 1]))
+        # NOTE:: if you are doing line
+        # `dataset = dataset.batch(batch_size).map(lambda x: x[:3])`
+        # THEN you must do the following
+        dataset = dataset.map(lambda x: tf.transpose(x, perm=[0, 2, 1]))
 
-        dataset = dataset.map(lambda x: tf.transpose(x, perm=[1, 0]))
+        # if you are not doing the line
+        # `dataset = dataset.batch(batch_size).map(lambda x: x[:3])`
+        # then you uncomment the following line
+        #dataset = dataset.map(lambda x: tf.transpose(x, perm=[1, 0]))
 
     # prefetching means you are moving this data into the ram, or another fast
     # memory. We are prefatching by 1; just because we have 1 batch that is gonna

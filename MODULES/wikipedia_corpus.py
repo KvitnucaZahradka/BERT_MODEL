@@ -12,7 +12,7 @@ import tensorflow as tf
 import time
 
 
-def wiki_corpus_iterator(path_to_wiki_zipped_corpus: str) -> 'iterator':
+def wiki_corpus_iterator(path_to_wiki_zipped_corpus: str) -> 'iter':
     """
     ADD DOCSTRING
     """

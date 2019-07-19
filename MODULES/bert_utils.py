@@ -113,10 +113,13 @@ def tf_record_batch_iterator(filename: str,
     #dataset = dataset.apply(tf.contrib.data.sliding_window_batch(window_size=batch_size))
     dataset = dataset.window(size=batch_size, shift=None, stride=1).flat_map(
         lambda x: x.batch(batch_size))
+    #dataset = dataset.window(size=batch_size, shift=None, stride=1)
 
     # now shift it by 3 ??
     # THIS IS VERY IMPORTANT :: THIS BATCHES THE DATA TO A BATCH WITH THE SUBTENSORS OF SIZE 3
-    dataset = dataset.batch(batch_size).map(lambda x: x[:3])
+    # now we are doing 2, because in bert model we have just current sentence
+    # and next setnence we want to translate to?
+    dataset = dataset.batch(batch_size).map(lambda x: x[:2])
 
     if time_major:
         # before we had ??

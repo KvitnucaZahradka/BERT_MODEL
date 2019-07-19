@@ -135,9 +135,11 @@ def produce_tf_sequence_w2v(sentence: str,
             _word_id = gensim_w2v_model.vocab[word].index
 
             if _is_good_index(_word_id):
-                # Note; we add + 4; reason is that we need 4 special tokens
-                # <EOS> = 3; <BOS> = 2, <UNK> = 1, <FILL> = 0
-                _word_id += 4
+                # Note; we add + 5; reason is that we need 5 special tokens
+                # <EOS> = 3; <BOS> = 2, <UNK> = 1, <FILL> = 0, <MASK> = 4
+                # NOW <MASK> IS VERY IMPORTANT
+                #_word_id += 4
+                _word_id += 5
             else:
                 _word_id = _unknown_word_id
         else:

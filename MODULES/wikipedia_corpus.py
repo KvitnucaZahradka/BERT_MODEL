@@ -192,6 +192,7 @@ def dump_wiki_text_as_tf_records(path_to_wiki_zipped_corpus: str,
     if verbose:
         print('--> Loading the pre-trained w2v model.')
         _tic = time.time()
+
     # open the gensim model
     _gensim_model = gensim.models.KeyedVectors.load_word2vec_format(path_to_gensim_model,
                                                                     binary=_bin)
@@ -240,7 +241,7 @@ def dump_wiki_text_as_tf_records(path_to_wiki_zipped_corpus: str,
             if index >= _wiki_index_bound:
                 break
 
-            # create wikipedia article sentences
+            # create Wikipedia article sentences
             _wiki_article_sentences = ' '.join(tokens).split('.')
 
             # produce a `seq` object for every sentence

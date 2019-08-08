@@ -59,7 +59,8 @@ def tf_record_iterator(filename: str,
 
 
 def tf_record_batch_iterator(filename: str,
-                             batch_size: int = 42,
+                             batch_size: int = 48,
+                             sub_slice_dimension: int = 2,
                              max_sequence_length: int = 40,
                              pad: bool = True,
                              eos_token: bool = True,
@@ -80,6 +81,11 @@ def tf_record_batch_iterator(filename: str,
     eos_token: str
 
     batch_size: int
+
+    sub_slice_dimension: int
+        is the subdivision within the batch windows,
+        each iterator provides the a windows (the skipping windows in this function)
+        within each of that skipping windows we have a smaller subdivision
 
     **kwargs
 
@@ -111,15 +117,28 @@ def tf_record_batch_iterator(filename: str,
     # now, apply the sliding window batch
     # old way:
     #dataset = dataset.apply(tf.contrib.data.sliding_window_batch(window_size=batch_size))
-    dataset = dataset.window(size=batch_size, shift=None, stride=1).flat_map(
-        lambda x: x.batch(batch_size))
+    #dataset = dataset.window(size=batch_size, shift=None, stride=1).flat_map(
+    #    lambda x: x.batch(batch_size))
     #dataset = dataset.window(size=batch_size, shift=None, stride=1)
 
     # now shift it by 3 ??
     # THIS IS VERY IMPORTANT :: THIS BATCHES THE DATA TO A BATCH WITH THE SUBTENSORS OF SIZE 3
     # now we are doing 2, because in bert model we have just current sentence
-    # and next setnence we want to translate to?
-    dataset = dataset.batch(batch_size).map(lambda x: x[:2])
+    # and next sentence we want to translate to?
+
+    #dataset = dataset.batch(batch_size).map(lambda x: x[:2])
+
+
+    # new way II:: should be better because is not chopping stuff
+    # if shift = None - that means that shift = batch_size - that means that from [1,2,3,4,5,6] we have [1,2,3], [4,5,6]
+    # stride 1 means no holes in a windows
+    #
+    # more about above `stride` and `shift` parameters here:
+    # https://www.tensorflow.org/api_docs/python/tf/contrib/data/sliding_window_batch
+    dataset = dataset.window(size=batch_size, shift=None, stride=1,\
+                            drop_remainder=True).flat_map(lambda x: x.batch(sub_slice_dimension))
+
+    dataset = dataset.batch(batch_size)
 
     if time_major:
         # before we had ??
@@ -127,12 +146,17 @@ def tf_record_batch_iterator(filename: str,
         # NOTE:: if you are doing line
         # `dataset = dataset.batch(batch_size).map(lambda x: x[:3])`
         # THEN you must do the following
-        dataset = dataset.map(lambda x: tf.transpose(x, perm=[0, 2, 1]))
+        #dataset = dataset.map(lambda x: tf.transpose(x, perm=[0, 2, 1]))
+
+        dataset = dataset.map(lambda x: tf.transpose(x, perm=[1, 2, 0]))
 
         # if you are not doing the line
         # `dataset = dataset.batch(batch_size).map(lambda x: x[:3])`
         # then you uncomment the following line
         #dataset = dataset.map(lambda x: tf.transpose(x, perm=[1, 0]))
+    else:
+        dataset = dataset.map(lambda x: tf.transpose(x, perm=[1, 0, 2] ))
+        #dataset = dataset.map(lambda x: tf.transpose(x, perm=[2, 0, 1]))
 
     # prefetching means you are moving this data into the ram, or another fast
     # memory. We are prefatching by 1; just because we have 1 batch that is gonna

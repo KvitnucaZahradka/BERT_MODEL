@@ -56,7 +56,6 @@ class BertTrain:
                  w2v_model: 'loaded_w2v_model',
                  num_heads: int,
                  mask = None,
-                 dropout_prob:float = 0.8,
                  dropout: str = None,
                  vocabulary_size: int = 20000,
                  batch_size: int = 128,
@@ -83,7 +82,6 @@ class BertTrain:
         self._time_major = time_major
         self._direction = rnn_direction
         self._mask = mask
-        self._dropout_prob = dropout_prob
         self._optimizer = optimizer
         self._dropout = dropout
         self._num_heads = num_heads
@@ -139,7 +137,6 @@ class BertTrain:
         self._output_layer.build(latent_space_dimension)
         # ------------------------------
 
-
     def _bert_sentence_encoder(self, one_data_batch_iter: Generator[tf.Tensor]) -> tf.Tensor:
         """
         ADD DOCSTRING
@@ -153,49 +150,10 @@ class BertTrain:
         # -- STEP 2 -- SIMILARLY TO SKIP THOUGHT, HERE ENCODE THE train_inputs
         # BUT UNLIKE THE skip though, HERE YOU MUST RETURN ALL EMBEDDINGS
         # YOU ARE GETTING AS YOU ARE EMBEDDING THE TRAIN INPUTS
-
-        # we will use the local layer, so we can do the skip connection
-
-        # question is whether you do not need to normalize this somehow specially??? so the addition
-        _encoded_sequences_positional = self._positional_encode_sequences(train_inputs)
-
-        # -- STEP 3 -- DO THE MULTI-HEAD ATTENTION
-        _encoded_sequences_multi_head = self._multi_head_attention(_encoded_sequences_positional)
-
-        # -- STEP 4 -- APPLY LAYER NORM TO MULTI HEAD SUBLAYER
-        _encoded_sequences_multi_head = tf.contrib.layers.layer_norm(_encoded_sequences_multi_head)
-
-        # -- STEP 5 -- APPLY DROPOUT
-        _encoded_sequences_multi_head = tf.nn.dropout(_encoded_sequences_multi_head, keep_prob=self._dropout_prob)
-
-        # -- STEP 6 -- ADD THE RESIDUAL CONNECTION
-        _encoded_sequences_multi_head = tf.add(_encoded_sequences_positional, _encoded_sequences_multi_head)
-
-        # -- STEP 7 -- ADD RELU FULLY CONNECTED NN (d_model::512 --> d_inner:: 4*512 = 2048)
-        # and then add linear 2048 --> 512
-        # maybe there is a better way how to do that; technically this should be
-        # `Position-wise Feed-Forward Networks` as in :
-        # http://nlp.seas.harvard.edu/2018/04/03/attention.html#applications-of-attention-in-our-model
-        # bot for now this should be ok
-        # we fix the inner dimension to be 4*hidden_dim = 512
-        _encoded_dense = tf.layers.dense(_encoded_sequences_multi_head,
-                                           self._latent_space_dimension*4,
-                                           activation=tf.nn.relu,
-                                           kernel_initializer='glorot_uniform_initializer')
-
-        _encoded_dense = tf.layers.dense(_encoded_dense, self._latent_space_dimension, activation=None,
-                                           kernel_initializer=tf.contrib.layers.xavier_initializer())
-
-        # -- STEP 8 -- REPEAT NORM AND DROPOUT AND SKIP CONNECTION LAYER
-        _encoded = tf.contrib.layers.layer_norm(_encoded_dense)
-
-        _encoded = tf.nn.dropout(_encoded, keep_prob=self._dropout_prob)
-
-        _encoded = tf.add(_encoded_dense, _encoded)
-
+        self._encoded_sequences = self._encode_sequences(train_inputs)
         raise NotImplementedError()
 
-    def _positional_encode_sequences(self, train_inputs: tf.Tensor) -> tf.Tensor:
+    def _encode_sequences(self, train_inputs: tf.Tensor) -> tf.Tensor:
         """
         ADD DOCSTRING
         """
@@ -255,8 +213,7 @@ class BertTrain:
             if self._direction == 'bidirectional':
                 _bw_cell = tf.contrib.cudnn_rnn.CudnnCompatibleGRUCell(self._latent_space_dimension)
 
-                _encoder_out = tf.nn.bidirectional_dynamic_rnn(_fw_cell, _bw_cell, _encoder_in,\
-                                                               sequence_length=_sequence_length,
+                _encoder_out = tf.nn.bidirectional_dynamic_rnn(_fw_cell, _bw_cell, _encoder_in, sequence_length=_sequence_length,
                                                            dtype=tf.float32, time_major=self._time_major)
 
                 # you must put those two tensor at the top of each other; so you will be consistent with CUDA NN
@@ -271,7 +228,7 @@ class BertTrain:
 
             else:
                 raise NotImplementedError('For RNN direction, you can use either `unidirectional` or `bidirectional`.')
-            # TO DO ! ???? i am not sure whether this is still true
+            # TO DO !
             # here synchronize the api of the else branch with the api that you got from
             # the cuda branch, because current _encoder_out !=api=! _encoder_out (in cuda)
 
@@ -330,7 +287,7 @@ class BertTrain:
             raise NotImplementedError
 
     def _attention(self,
-                   name:str,\
+                   name: str,
                    query: tf.Tensor,
                    key: tf.Tensor,
                    value: tf.Tensor) -> (tf.Tensor, tf.Tensor):
@@ -375,7 +332,8 @@ class BertTrain:
         # is this upload correct and doing any good?
         # Y, at this point I do not know how to get the intermediate layer, maybe by eval??
         # maybe ONLY if you are using the eager evaluation??
-        self._attention_layers[name] += [_att_u_probability.eval()]
+        if tf.executing_eagerly():
+            self._attention_layers[name] += [_att_u_probability.eval()]
 
         if self._dropout is not None:
             raise NotImplementedError
@@ -455,7 +413,7 @@ class BertTrain:
         # _X = tf.stack(list(zip(W_i_Q, W_i_K, W_i_V)))
 
         # NOTE we must STACK THEM AS ABOVE; since the tf.map_fn ONLY UNSTACK BY THE 0-th DIMENSION
-        _attentions = tf.map_fn(lambda W: self._attention(_attention_layer_name,query @ W[0], key @ W[1], value @ W[2], mask, dropout), \
+        _attentions = tf.map_fn(lambda W: self._attention(_attention_layer_name, query @ W[0], key @ W[1], value @ W[2], mask, dropout), \
                                 tf.stack(list(zip(W_i_Q, W_i_K, W_i_V))), dtype=tf.float32)
 
         # query 33, 42, 512
@@ -481,6 +439,15 @@ class BertTrain:
         # -- step 3 -- multiply by the output matrix
         return _multi_h_attention @ W_O
 
+
+    def _layer_normalize(self, batched_layer):
+        """
+
+        this function normalizes the
+        Returns
+        -------
+
+        """
 
     def _get_embedding(self, query: 'tf tensor'):
         """

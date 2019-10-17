@@ -5,6 +5,7 @@ Created on Sat Jun 29 2019
 """
 import tensorflow as tf
 import os
+import numpy as np
 
 
 def parse_and_pad(seq,
@@ -226,12 +227,55 @@ def inspect_tf_record_files_one_by_one(path_to_tf_records: str,
     with tf.Session() as sess:
 
         # create an iterator over the dumped files
-        tf_record_iter = tf_record_batch_iterator(os.path.join(path_to_tf_records,
-                                                               name_of_tf_records),
-                                                  **kwargs)
+        tf_record_iter = tf_record_batch_iterator(os.path.join(path_to_tf_records, name_of_tf_records), **kwargs)
 
         for ind in range(upper_bound):
             try:
                 print(sess.run(tf_record_iter.get_next()))
             except tf.errors.OutOfRangeError:
                 break
+
+
+def apply_random_fill_mask(in_tensor: tf.Tensor, in_tensor_shape: tuple, replacement:(int, float),
+                           replacement_rate: float = 0.2) -> tf.Tensor:
+    """
+
+    Parameters
+    ----------
+    in_tensor: tf.Tensor
+        is the TensorFlow Variable to be changed using the random boolean mask,
+        by this tensor we mean int or float type of tensor.
+
+    in_tensor_shape: tuple
+        is the tuple representing the shape of the in_tensor
+
+    replacement: int or float
+    is the the mask token to be used to actually replace parts of the tensor,
+    it is of the same type as members of `in_tensor`.
+
+    replacement_rate: float
+        is the fraction of elements to be replaced (must be between 0 (inclusive) and 1 (inclusive)),
+        -- default -- is 0.2
+
+    Returns
+    -------
+    tf.Tensor
+        is the TensorFlow variable with replaced members using random boolean mask
+
+    Examples
+    --------
+
+    """
+    assert (1.0 >= replacement_rate >= 0.0), f'The replacement rate you provided: {replacement_rate}' \
+        f'does not represent probability.'
+
+    # -- step  0 -- create boolean mask
+    _bool_mask = np.random.choice([0, 1], size=in_tensor_shape,
+                                  p=((1. - replacement_rate), replacement_rate)).astype(np.bool)
+
+    _bool_mask = tf.constant(~_bool_mask, dtype=tf.bool)
+
+    # -- get the full masking tensor --
+    _masking_tensor = replacement*tf.ones_like(in_tensor)
+
+    return tf.where_v2(_masking_tensor, in_tensor, _bool_mask)

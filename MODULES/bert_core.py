@@ -1,8 +1,8 @@
 import tensorflow as tf
-from .bert_utils import tf_record_batch_iterator as rec_batch
+from bert_utils import tf_record_batch_iterator as rec_batch
 import numpy as np
 
-from typing import Generator
+from typing import Generator, Iterator
 from collections import defaultdict
 
 
@@ -172,7 +172,8 @@ class BertTrain:
         raise NotImplementedError
 
 
-    def _bert_sentence_encoder(self, one_data_batch_iter: Generator[tf.Tensor],\
+    def _bert_sentence_encoder(self,
+                               one_data_batch_iter: Iterator[tf.Tensor],
                                batch_size: int,
                                layer_name: str = 'bert_sentence_encoder') -> (tf.Tensor, tf.Tensor):
         """

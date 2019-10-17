@@ -2,9 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="9b6bc00e-dc48-48b5-99a8-29ed95e6cfc4" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/BERT_MODEL.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/BERT_MODEL.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MODULES/bert_core.py" beforeDir="false" afterPath="$PROJECT_DIR$/MODULES/bert_core.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MODULES/bert_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/MODULES/bert_utils.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -14,13 +14,25 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/MODULES/bert_core.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="186">
-              <caret line="441" lean-forward="true" selection-start-line="441" selection-end-line="441" />
+            <state relative-caret-position="-463">
+              <caret line="182" column="18" selection-start-line="182" selection-start-column="18" selection-end-line="182" selection-end-column="18" />
               <folding>
                 <element signature="e#0#23#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/MODULES/bert_utils.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="134">
+              <caret line="264" column="12" lean-forward="true" selection-start-line="264" selection-start-column="12" selection-end-line="264" selection-end-column="12" />
+              <folding>
+                <element signature="e#51#74#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -40,6 +52,12 @@
       <find>dataset.win</find>
       <find>ite</find>
       <find>self._attention_layers</find>
+      <find>_apply_mask</find>
+      <find>_multi_head_attention</find>
+      <find>48</find>
+      <find>_encoder_mask</find>
+      <find>'W_O_{}'</find>
+      <find>Iterator</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -49,13 +67,13 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/MODULES/wikipedia_corpus.py" />
-        <option value="$PROJECT_DIR$/MODULES/bert_utils.py" />
         <option value="$PROJECT_DIR$/MODULES/bert_core.py" />
+        <option value="$PROJECT_DIR$/MODULES/bert_utils.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="64" />
+    <option name="x" value="34" />
     <option name="y" value="23" />
     <option name="width" value="1403" />
     <option name="height" value="877" />
@@ -65,7 +83,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -87,6 +104,7 @@
           <select />
         </subPane>
       </pane>
+      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -154,17 +172,30 @@
       <workItem from="1565224941629" duration="6029000" />
       <workItem from="1565389294989" duration="1250000" />
       <workItem from="1565481660109" duration="264000" />
+      <workItem from="1568078899137" duration="1915000" />
+      <workItem from="1568492110819" duration="3813000" />
+      <workItem from="1571095112903" duration="768000" />
+      <workItem from="1571101636851" duration="501000" />
+      <workItem from="1571277627953" duration="1922000" />
     </task>
+    <task id="LOCAL-00001" summary="new changes added to a encoder layers.">
+      <created>1567480710543</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1567480710543</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="20284000" />
+    <option name="totallyTimeSpent" value="30227000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="64" y="23" width="1403" height="877" extended-state="0" />
+    <frame x="34" y="23" width="1403" height="877" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.18662748" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.14548126" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -178,35 +209,42 @@
       <window_info anchor="bottom" id="Version Control" order="8" />
       <window_info anchor="bottom" id="Database Changes" order="9" />
       <window_info anchor="bottom" id="Event Log" order="10" side_tool="true" />
-      <window_info anchor="bottom" id="Terminal" order="11" />
-      <window_info active="true" anchor="bottom" id="Python Console" order="12" visible="true" weight="0.16815287" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="11" visible="true" weight="0.3299363" />
+      <window_info anchor="bottom" id="Python Console" order="12" weight="0.16815287" />
       <window_info anchor="right" id="Commander" order="0" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
       <window_info anchor="right" id="SciView" order="3" />
-      <window_info anchor="right" x="0" y="0" width="304" height="677" id="Documentation" order="4" side_tool="true" visible="true" weight="0.1241734" />
+      <window_info anchor="right" x="0" y="0" width="304" height="677" id="Documentation" order="4" side_tool="true" visible="true" weight="0.17854519" />
       <window_info anchor="right" id="Database" order="5" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
   </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="new changes added to a encoder layers." />
+    <option name="LAST_COMMIT_MESSAGE" value="new changes added to a encoder layers." />
+  </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/MODULES/bert_utils.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1214">
-          <caret line="170" column="40" lean-forward="true" selection-start-line="170" selection-start-column="40" selection-end-line="170" selection-end-column="40" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/MODULES/wikipedia_corpus.py" />
     <entry file="file://$PROJECT_DIR$/MODULES/wikipedia_corpus (1).py" />
     <entry file="file://$PROJECT_DIR$/MODULES/bert_core.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="186">
-          <caret line="441" lean-forward="true" selection-start-line="441" selection-end-line="441" />
+        <state relative-caret-position="-463">
+          <caret line="182" column="18" selection-start-line="182" selection-start-column="18" selection-end-line="182" selection-end-column="18" />
           <folding>
             <element signature="e#0#23#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/MODULES/bert_utils.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="134">
+          <caret line="264" column="12" lean-forward="true" selection-start-line="264" selection-start-column="12" selection-end-line="264" selection-end-column="12" />
+          <folding>
+            <element signature="e#51#74#0" expanded="true" />
           </folding>
         </state>
       </provider>

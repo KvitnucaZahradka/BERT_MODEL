@@ -1,4 +1,8 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import tensorflow as tf
+import bert_utils as but
 from bert_utils import tf_record_batch_iterator as rec_batch
 import numpy as np
 
@@ -56,30 +60,18 @@ class BertTrain:
 
     """
 
-    def __init__(self,
-                 path_to_tf_records: str,
-                 w2v_model: 'loaded_w2v_model',
-                 num_heads: int,
-                 n_parallel_layers: int = 6,
-                 mask = None,
-                 dropout_prob:float = 0.8,
-                 dropout: str = None,
-                 vocabulary_size: int = 20000,
-                 batch_size: int = 128,
-                 latent_space_dimension: int = 512,
-                 max_sequence_length: int = 40,
-                 learning_rate: float = 1e-3,
-                 max_grad_norm: float = 10,
-                 optimizer: str = None,
-                 number_of_rnn_in_layers=1,
-                 rnn_direction:str = 'bidirectional',
-                 cuda: bool = True,
-                 time_major: bool = True):
-        # -------- CODE -------------------------------------------------------
+    def __init__(self, path_to_tf_records: str, w2v_model: 'loaded_w2v_model', num_heads: int,
+                 n_parallel_layers: int = 6, mask=None, dropout_prob: float = 0.8, dropout: str = None,
+                 vocabulary_size: int = 20000, batch_size: int = 128, latent_space_dimension: int = 512,
+                 max_sequence_length: int = 40, learning_rate: float = 1e-3, max_grad_norm: float = 10,
+                 optimizer: str = None, number_of_rnn_in_layers: int = 1, rnn_direction:str = 'bidirectional',
+                 cuda: bool = True, time_major: bool = True):
+
         self._N_parallel_layers = n_parallel_layers
         self._w2v_model = w2v_model
         self._vocabulary_size = vocabulary_size
 
+        # dimensions of batch
         self._batch_size = batch_size
         self._latent_space_dimension = latent_space_dimension
         self._max_sequence_length = max_sequence_length
@@ -107,10 +99,9 @@ class BertTrain:
         # here you will store the individual attention layers
         self._attention_layers = defaultdict(lambda: [])
 
-
         # define tensor flow variables
-        self.global_step = tf.get_variable(
-            'global_step', shape=[], trainable=False, initializer=tf.initializers.zeros())
+        self.global_step = tf.get_variable('global_step', shape=[], trainable=False,
+                                           initializer=tf.initializers.zeros())
 
         # we will train special embeddings for <bos> == beginning of sentence = 2
         # <eos> == end of sentence  is 3, <UNK> == unknown is 1 and <FILL> is 0
@@ -121,10 +112,8 @@ class BertTrain:
         # and it is the filling character.
 
         # below the 5 are those 5 tokens and we have sqrt(5-1)
-        special_embeddings = tf.get_variable('special_embeddings',
-                                             shape=[5, self._vector_embedding_dimension],
-                                             initializer=tf.initializers.random_uniform(
-                                                 -np.sqrt(4), np.sqrt(4)),
+        special_embeddings = tf.get_variable('special_embeddings', shape=(5, self._vector_embedding_dimension),
+                                             initializer=tf.initializers.random_uniform(-np.sqrt(4), np.sqrt(4)),
                                              trainable=True)
 
         # here get the embeddings from normal word 2 vec model
@@ -134,10 +123,8 @@ class BertTrain:
         # `vocabulary_size` number of most used words
         # also by default we will train them, this might not be necessary
         # but expect that this might produce better model.
-        word_embeddings = tf.get_variable('word_embeddings', shape=[
-                                          vocabulary_size, self._vector_embedding_dimension],
-                                          initializer=tf.initializers.constant(
-                                              w2v_model.vectors[:vocabulary_size]),
+        word_embeddings = tf.get_variable('word_embeddings', shape=[vocabulary_size, self._vector_embedding_dimension],
+                                          initializer=tf.initializers.constant(w2v_model.vectors[:vocabulary_size]),
                                           trainable=True)
 
         # ok here we are producing the actual embeddings
@@ -153,9 +140,9 @@ class BertTrain:
         self._output_layer.build(latent_space_dimension)
         # ------------------------------
 
-    def _encoder_mask(self, input_tensor: tf.Tensor, mask_percentage:float) -> tf.Tensor:
+    def _encoder_mask(self, input_tensor: tf.Tensor, mask_percentage: float, replacement: (int, float)) -> tf.Tensor:
         """
-
+        This is the masking function that we will apply only during the training
 
         Parameters
         ----------
@@ -164,34 +151,67 @@ class BertTrain:
         mask_percentage:float
             is the float between 0 and 1 and represents the percentage of
 
+        replacement: is float or int
+            represents what percentage of the input tensor you want to mask.
+
         Returns
         -------
+        tf.Tensor
+
+        Notes
+        -----
+
+        Examples
+        --------
 
         """
 
-        raise NotImplementedError
+        # -- step 0 -- create the shape
+        # this holds the shape of one tensor in a batch
+        # also note that this is BEFORE the time majorization
+        _slice_shape = (self._latent_space_dimension, self._max_sequence_length)
 
+        # -- step 1 -- create the function you want to apply over the batch
+        _mask_application = lambda in_tensor: but.apply_random_fill_mask(in_tenso=in_tensor,
+                                                                         in_tensor_shape=_slice_shape,
+                                                                         replacement=replacement,
+                                                                         replacement_rate=mask_percentage)
 
-    def _bert_sentence_encoder(self,
-                               one_data_batch_iter: Iterator[tf.Tensor],
-                               batch_size: int,
-                               layer_name: str = 'bert_sentence_encoder') -> (tf.Tensor, tf.Tensor):
+        return tf.map_fn(lambda in_tensor: _mask_application(in_tensor), input_tensor, dtype=tf.int32)
+
+    def _bert_sentence_encoder(self, one_data_batch_iter: Iterator[tf.Tensor], batch_size: int, train: bool = True,
+                               layer_name: str = 'bert_sentence_encoder', **kwargs) -> (tf.Tensor, tf.Tensor):
         """
         ADD DOCSTRING
 
         Parameters
         ----------
-        one_data_batch_iter
+        one_data_batch_iter: iterator over the tensor
+
+        train: bool
+            is boolean variable indicating whether you are doing the training or no
 
         batch_size: int
             is the size of one batch, must match with the batch used in preparation of
             `one_data_batch_iter`
 
+        **mask_percentage:float
+            determines what percentage of input tensor should be masked
+            -- default -- is 0.2
+
+        **replacement: int or float
+            is the replacement//masking `symbol`, can be either float or int
+            -- default -- is 4, since it is a symbol for '<MASK>' token.
+
         Returns
         -------
             tuple
-                is thetuple of tensors, encoded input and the `forward labels`
+                is the tuple of tensors, encoded input and the `forward labels`.
         """
+        # -- defaults --
+        _mask_percentage = kwargs.get('mask_percentage', 0.2)
+        _replacement = kwargs.get('replacement', 4)
+
         # -- STEP 1 -- GET train_inputs AND forward_labels FROM ONE BATCH
         # ITERATOR
 
@@ -200,7 +220,8 @@ class BertTrain:
 
         # -- STEP 2 -- APPLY THE ENCODER MASK
         # ?? only at the time of training not inference ??
-        train_inputs = self._encoder_mask(train_inputs)
+        if train:
+            train_inputs = self._encoder_mask(train_inputs, mask_percentage=_mask_percentage, replacement=_replacement)
 
         # -- STEP 2 -- SIMILARLY TO SKIP THOUGHT, HERE ENCODE THE train_inputs
         # BUT UNLIKE THE skip though, HERE YOU MUST RETURN ALL EMBEDDINGS
@@ -221,14 +242,10 @@ class BertTrain:
             _input_x = tf.identity(_encoded_sequences_positional, name="{}_{}".format(layer_name, _ind))
 
             # -- STEP 3 -- DO THE MULTI-HEAD ATTENTION
-            _encoded_sequences_multi_head =\
-                self._multi_head_attention(name_of_attention='{}_{}'.format(layer_name, _ind),
-                                           query=_input_x,
-                                           key=_input_x,
-                                           value=_input_x,
-                                           num_heads=self._num_heads,
-                                           batch_size=batch_size,
-                                           d_model=self._latent_space_dimension)
+            _encoded_sequences_multi_head = \
+                self._multi_head_attention(name_of_attention='{}_{}'.format(layer_name, _ind), query=_input_x,
+                                           key=_input_x, value=_input_x, num_heads=self._num_heads,
+                                           batch_size=batch_size, d_model=self._latent_space_dimension)
 
             # -- STEP 4 -- APPLY LAYER NORM TO MULTI HEAD SUBLAYER
             _encoded_sequences_multi_head = tf.contrib.layers.layer_norm(_encoded_sequences_multi_head)
@@ -246,14 +263,12 @@ class BertTrain:
             # http://nlp.seas.harvard.edu/2018/04/03/attention.html#applications-of-attention-in-our-model
             # but for now this should be ok
             # we fix the inner dimension to be 4*hidden_dim = 512
-            _encoded_dense = tf.layers.dense(_encoded_sequences_multi_head,
-                                           self._latent_space_dimension*4,
-                                           activation=tf.nn.relu,
-                                           kernel_initializer='glorot_uniform_initializer')
+            _encoded_dense = tf.layers.dense(_encoded_sequences_multi_head, self._latent_space_dimension*4,
+                                             activation=tf.nn.relu, kernel_initializer='glorot_uniform_initializer')
 
             # ?? maybe only at the time of training ??
             _encoded_dense = tf.layers.dense(_encoded_dense, self._latent_space_dimension, activation=None,
-                                           kernel_initializer=tf.contrib.layers.xavier_initializer())
+                                             kernel_initializer=tf.contrib.layers.xavier_initializer())
 
             # -- STEP 8 -- REPEAT NORM AND DROPOUT AND SKIP CONNECTION LAYER
             _encoded = tf.contrib.layers.layer_norm(_encoded_dense)
@@ -270,14 +285,19 @@ class BertTrain:
         # -- STEP 10 -- put it together into one tensor
         return tf.stack(_resulting_list), fw_labels
 
-    def _bert_sentence_decoder(self, forward_labels: tf.Tensor,\
-
-                               layer_name: str = 'bert_sentence_decoder') -> tf.Tensor:
+    def _bert_sentence_decoder(self, forward_labels: tf.Tensor, layer_name: str = 'bert_sentence_decoder') -> tf.Tensor:
         raise NotImplementedError()
 
     def _positional_encode_sequences(self, train_inputs: tf.Tensor) -> tf.Tensor:
         """
-        ADD DOCSTRING
+
+        Parameters
+        ----------
+        train_inputs: tf.Tensor
+
+        Returns
+        -------
+        tf.Tensor
         """
 
         # -- STEP 1 -- GET INITIAL EMBEDDINGS (think about w2v embedding of sequences)
@@ -292,7 +312,7 @@ class BertTrain:
         # ALSO CUDA GRU EXPECTS THE TIME MAJOR!!!!
         #
         # WHAT FOLLOWS DOES NOT WORK FOR US I GUESS
-        if self._cuda and self._time_major:
+        if self._cuda:
             ## YOU SHOULD SAY SOME WARNING THAT YOU DO NOT HAVE either cuda OR _time_major
 
             # NOTE:
@@ -301,7 +321,7 @@ class BertTrain:
             # IF TIME  MAJORIZED: (sequence_length, batch_size, 2*_latent_space_dimension), if you use biderictional
             # OR (sequence_length, batch_size, _latent_space_dimension) if you use unidirectional
             #
-            # - the second part of that touple is THE TUPLE of the type ('final output',)
+            # - the second part of that tuple is THE TUPLE of the type ('final output',)
             # the `final output` of the rnn
             # and it has shape (2, batch_size, _latent_space_dimension) if `biderictional`,
             # where 2 means == forward cell result, and backward cell result
@@ -320,30 +340,31 @@ class BertTrain:
             #
             # note, in our case we are taking the part [0] because we want all results
             # and we want to put the self-attention mechanism
-            _encoder_out = tf.contrib.cudnn_rnn.CudnnGRU(num_layers=self._number_rnn_in_layers,
-                                                         num_units=self._latent_space_dimension,
-                                                         direction=self._direction)(_encoder_in)[0]
+            if self._time_major:
+                _encoder_out = tf.contrib.cudnn_rnn.CudnnGRU(num_layers=self._number_rnn_in_layers,
+                                                             num_units=self._latent_space_dimension,
+                                                             direction=self._direction)(_encoder_in)[0]
+            else:
+                raise ValueError('`cuda` expects time majorozation!')
         else:
             # ok I am doing just unidirectional, so I need only th forward cell
             _fw_cell = tf.contrib.cudnn_rnn.CudnnCompatibleGRUCell(self._latent_space_dimension)
 
-            _sequence_length = tf.reduce_sum(tf.sign(train_inputs),
-                                             reduction_indices=int(not self._time_major))
+            _sequence_length = tf.reduce_sum(tf.sign(train_inputs), reduction_indices=int(not self._time_major))
 
             if self._direction == 'bidirectional':
                 _bw_cell = tf.contrib.cudnn_rnn.CudnnCompatibleGRUCell(self._latent_space_dimension)
 
-                _encoder_out = tf.nn.bidirectional_dynamic_rnn(_fw_cell, _bw_cell, _encoder_in,\
-                                                               sequence_length=_sequence_length,
-                                                           dtype=tf.float32, time_major=self._time_major)
+                _encoder_out = tf.nn.bidirectional_dynamic_rnn(_fw_cell, _bw_cell, _encoder_in,
+                                                               sequence_length=_sequence_length, dtype=tf.float32,
+                                                               time_major=self._time_major)
 
                 # you must put those two tensor at the top of each other; so you will be consistent with CUDA NN
                 _encoder_out = tf.concat(_encoder_out[0], axis=-1)
 
             elif self._direction == 'unidirectional':
-                _encoder_out = tf.nn.dynamic_rnn(_fw_cell, _encoder_in,
-                                                       sequence_length=_sequence_length,
-                                                       dtype=tf.float32, time_major=self._time_major)
+                _encoder_out = tf.nn.dynamic_rnn(_fw_cell, _encoder_in, sequence_length=_sequence_length,
+                                                 dtype=tf.float32, time_major=self._time_major)
 
                 _encoder_out = _encoder_out[0]
 
@@ -368,26 +389,20 @@ class BertTrain:
         -------
         tensor
             returns the batch tf.matmul -  ready tensor; i.e. will have dimension
-            (batch_size, embedding_dimension, time_dimension)
+            (batch_size, time_dimension, embedding_dimension)
 
         """
-
         if self._time_major:
             # this does the following transformation
             # input is : (time_dimension, batch_size, embedding_dimension)
-            # output will be : (batch_size, embedding_dimension, time_dimension)
+            # output will be : (batch_size, time_dimension, embedding_dimension)
             return tf.transpose(tensor, perm=[1, 0, 2])
 
         else:
             raise NotImplementedError
 
-
-    def _attention(self,
-                   name: str,\
-                   query: tf.Tensor,
-                   key: tf.Tensor,
-                   value: tf.Tensor,\
-                   dropout) -> (tf.Tensor, tf.Tensor):
+    def _attention(self, name: str, query: tf.Tensor, key: tf.Tensor, value: tf.Tensor,
+                   dropout: bool) -> (tf.Tensor, tf.Tensor):
         """
 
         Parameters
@@ -397,15 +412,11 @@ class BertTrain:
             this layer's unormalized probabilities are stored in the instance memmory
         query
 
-        key
+        key: tf.Tensor
 
-        value
+        value: tf.Tensor
 
-        mask
-            is None or
-
-        dropout
-            is None or
+        dropout: bool
 
         Returns
         -------
@@ -423,7 +434,7 @@ class BertTrain:
         # -- step 2 -- calculate scores
         _scores = (query @ tf.transpose(key, perm=[0, 2, 1])) / tf.math.sqrt(_d_k)
 
-        # calculate attention unnorm. probability
+        # calculate attention unorm. probability
         # and upload it to the instance memory
         _att_u_probability = tf.nn.softmax(_scores, axis=-1, name=name)
 
@@ -432,21 +443,13 @@ class BertTrain:
         # maybe ONLY if you are using the eager evaluation??
 
         #self._attention_layers[name] += [tf.identity(_att_u_probability, name = name)]
-
         if dropout is not None:
             _att_u_probability = tf.nn.dropout(_att_u_probability, keep_prob=self._dropout_prob)
 
         return _att_u_probability @ value
 
-
-    def _multi_head_attention(self,
-                              name_of_attention: str,
-                              query: tf.Tensor,
-                              key: tf.Tensor,
-                              value: tf.Tensor,
-                              num_heads: int,
-                              batch_size: int,
-                              d_model: int,
+    def _multi_head_attention(self, name_of_attention: str, query: tf.Tensor, key: tf.Tensor, value: tf.Tensor,
+                              num_heads: int, batch_size: int, d_model: int,
                               dropout: bool = None) -> (tf.Tensor, tf.Tensor):
         """
         Parameters
@@ -515,12 +518,9 @@ class BertTrain:
 
         # NOTE we must STACK THEM AS ABOVE; since the tf.map_fn ONLY UNSTACK BY THE 0-th DIMENSION
         # !!! also the mask here is problematic, since in the function self._attention I do not have parameter mask
-        _attentions = tf.map_fn(lambda W: self._attention(_attention_layer_name,
-                                                          query @ W[0],
-                                                          key @ W[1],
-                                                          value @ W[2],
-                                                          dropout),
-                                tf.stack(list(zip(W_i_Q, W_i_K, W_i_V))), dtype=tf.float32)
+        _attentions = tf.map_fn(lambda W: self._attention(_attention_layer_name, query @ W[0], key @ W[1], value @ W[2],
+                                                          dropout), tf.stack(list(zip(W_i_Q, W_i_K, W_i_V))),
+                                dtype=tf.float32)
 
         # query 33, 42, 512
         # W[0] 33, 512, 64
@@ -544,7 +544,6 @@ class BertTrain:
 
         # -- step 3 -- multiply by the output matrix
         return _multi_h_attention @ W_O
-
 
     def _get_embedding(self, query: 'tf tensor'):
         """

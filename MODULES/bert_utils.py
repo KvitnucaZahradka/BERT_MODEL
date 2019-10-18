@@ -1,23 +1,36 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Created on Sat Jun 29 2019
 
 @author: polny
 """
+
 import tensorflow as tf
 import os
 import numpy as np
 
+from typing import Iterator
 
-def parse_and_pad(seq,
-                  max_sequence_length: int,
-                  eos_token: bool = True) -> tf.Tensor:
+def parse_and_pad(seq, max_sequence_length: int, eos_token: bool = True) -> tf.Tensor:
     """
+
+    Parameters
+    ----------
+    seq
+
+    max_sequence_length: int
+
+    eos_token: bool
+
+    Returns
+    -------
 
     """
     sequence_features = {'tokens': tf.FixedLenSequenceFeature([], dtype=tf.int64)}
 
-    _, sequence_parsed = tf.parse_single_sequence_example(serialized=seq,
-                                                          sequence_features=sequence_features)
+    _, sequence_parsed = tf.parse_single_sequence_example(serialized=seq, sequence_features=sequence_features)
 
     t = sequence_parsed['tokens']
 
@@ -27,11 +40,8 @@ def parse_and_pad(seq,
     return tf.pad(t, [[0, max_sequence_length - tf.shape(t)[0]]])
 
 
-def tf_record_iterator(filename: str,
-                       max_sequence_length: int = 40,
-                       pad: bool = True,
-                       eos_token: bool = True,
-                       **kwargs) -> 'iter':
+def tf_record_iterator(filename: str, max_sequence_length: int = 40, pad: bool = True, eos_token: bool = True,
+                       **kwargs) -> Iterator[tf.Tensor]:
     """
     this produces ONE record only; it does not produce batches
     first and foremost;
@@ -46,27 +56,21 @@ def tf_record_iterator(filename: str,
     # you must add 2; because of <eos> and <bos> tokens
     max_sequence_length += 2
 
-    # formaly read the `dataset`
+    # formally read the `dataset`
     dataset = tf.data.TFRecordDataset(filename)
 
     # only if you want to pad sequence; use max_sequence_length and eos token.
     if pad:
         dataset = dataset.map(lambda t, sent_length=max_sequence_length,
-                              eos_token=eos_token:
-                              parse_and_pad(t, sent_length, eos_token))
+                                     eos_token=eos_token: parse_and_pad(t, sent_length, eos_token))
 
     # ?? I do not understand what `prefetch` does ??
     return dataset.prefetch(1).make_one_shot_iterator()
 
 
-def tf_record_batch_iterator(filename: str,
-                             batch_size: int = 48,
-                             sub_slice_dimension: int = 2,
-                             max_sequence_length: int = 40,
-                             pad: bool = True,
-                             eos_token: bool = True,
-                             time_major: bool = False,
-                             **kwargs):
+def tf_record_batch_iterator(filename: str, batch_size: int = 48, sub_slice_dimension: int = 2,
+                             max_sequence_length: int = 40, pad: bool = True, eos_token: bool = True,
+                             time_major: bool = False, **kwargs) -> Iterator[tf.Tensor]:
     """
     This function creates an iterator over tf records; but produces a batches
     instead of single examples. It implements the sliding window batch.
@@ -91,9 +95,9 @@ def tf_record_batch_iterator(filename: str,
     **kwargs
 
 
-    Returns
-    -------
-    iterator
+    Yields
+    ------
+    tf.Tensor
 
     Notes
     -----
@@ -105,7 +109,7 @@ def tf_record_batch_iterator(filename: str,
     # you must add 2; because of <eos> and <bos> tokens
     max_sequence_length += 2
 
-    # formaly read the `dataset`
+    # formally read the `dataset`
     dataset = tf.data.TFRecordDataset(filename)
 
     # map `parse_and_pad` if requested
@@ -167,10 +171,7 @@ def tf_record_batch_iterator(filename: str,
     return dataset.make_one_shot_iterator()
 
 
-def inspect_batch_of_tf_record_files(path_to_tf_records: str,
-                                     name_of_tf_records: str,
-                                     batch_size: int = 142,
-                                     **kwargs):
+def inspect_batch_of_tf_record_files(path_to_tf_records: str, name_of_tf_records: str, batch_size: int = 142, **kwargs):
     """
     Parameters
     ----------
@@ -199,10 +200,8 @@ def inspect_batch_of_tf_record_files(path_to_tf_records: str,
             raise
 
 
-def inspect_tf_record_files_one_by_one(path_to_tf_records: str,
-                                       name_of_tf_records: str,
-                                       upper_bound: int = 42,
-                                       **kwargs):
+def inspect_tf_record_files_one_by_one(path_to_tf_records: str, name_of_tf_records: str,
+                                       upper_bound: int = 42,**kwargs):
     """
 
     Parameters
@@ -236,7 +235,7 @@ def inspect_tf_record_files_one_by_one(path_to_tf_records: str,
                 break
 
 
-def apply_random_fill_mask(in_tensor: tf.Tensor, in_tensor_shape: tuple, replacement:(int, float),
+def apply_random_fill_mask(in_tensor: tf.Tensor, in_tensor_shape: tuple, replacement: (int, float),
                            replacement_rate: float = 0.2) -> tf.Tensor:
     """
 

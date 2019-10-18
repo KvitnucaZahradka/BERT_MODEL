@@ -5,6 +5,7 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MODULES/bert_core.py" beforeDir="false" afterPath="$PROJECT_DIR$/MODULES/bert_core.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/MODULES/bert_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/MODULES/bert_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MODULES/wikipedia_corpus.py" beforeDir="false" afterPath="$PROJECT_DIR$/MODULES/wikipedia_corpus.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -14,11 +15,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/MODULES/bert_core.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-463">
-              <caret line="182" column="18" selection-start-line="182" selection-start-column="18" selection-end-line="182" selection-end-column="18" />
+            <state relative-caret-position="36">
+              <caret line="164" column="16" selection-start-line="164" selection-start-column="16" selection-end-line="164" selection-end-column="16" />
               <folding>
                 <element signature="e#0#23#0" expanded="true" />
               </folding>
@@ -26,11 +27,23 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/MODULES/wikipedia_corpus.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="150">
+              <caret line="141" column="68" selection-start-line="141" selection-start-column="64" selection-end-line="141" selection-end-column="68" />
+              <folding>
+                <element signature="e#51#60#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/MODULES/bert_utils.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="134">
-              <caret line="264" column="12" lean-forward="true" selection-start-line="264" selection-start-column="12" selection-end-line="264" selection-end-column="12" />
+            <state relative-caret-position="-167">
+              <caret line="237" column="64" selection-start-line="237" selection-start-column="49" selection-end-line="237" selection-end-column="64" />
               <folding>
                 <element signature="e#51#74#0" expanded="true" />
               </folding>
@@ -46,7 +59,6 @@
       <find>self._time</find>
       <find>tf.ge</find>
       <find>get_var</find>
-      <find>_matmul_ready_encoded_batch_tensor</find>
       <find>tf.get_variable</find>
       <find>tf_reco</find>
       <find>dataset.win</find>
@@ -55,9 +67,19 @@
       <find>_apply_mask</find>
       <find>_multi_head_attention</find>
       <find>48</find>
-      <find>_encoder_mask</find>
       <find>'W_O_{}'</find>
       <find>Iterator</find>
+      <find>dropout</find>
+      <find>_attention</find>
+      <find>optimizer</find>
+      <find>self._optimizer</find>
+      <find>encode</find>
+      <find>one_data_batch_iter</find>
+      <find>_bert_sentence_encoder</find>
+      <find>_matmul_ready_encoded_batch_tensor</find>
+      <find>self._time_major</find>
+      <find>MASK</find>
+      <find>_encoder_mask</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -67,8 +89,8 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/MODULES/wikipedia_corpus.py" />
-        <option value="$PROJECT_DIR$/MODULES/bert_core.py" />
         <option value="$PROJECT_DIR$/MODULES/bert_utils.py" />
+        <option value="$PROJECT_DIR$/MODULES/bert_core.py" />
       </list>
     </option>
   </component>
@@ -176,7 +198,7 @@
       <workItem from="1568492110819" duration="3813000" />
       <workItem from="1571095112903" duration="768000" />
       <workItem from="1571101636851" duration="501000" />
-      <workItem from="1571277627953" duration="1922000" />
+      <workItem from="1571277627953" duration="9209000" />
     </task>
     <task id="LOCAL-00001" summary="new changes added to a encoder layers.">
       <created>1567480710543</created>
@@ -189,13 +211,13 @@
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="30227000" />
+    <option name="totallyTimeSpent" value="37514000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="34" y="23" width="1403" height="877" extended-state="0" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.14548126" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.14548126" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -209,13 +231,13 @@
       <window_info anchor="bottom" id="Version Control" order="8" />
       <window_info anchor="bottom" id="Database Changes" order="9" />
       <window_info anchor="bottom" id="Event Log" order="10" side_tool="true" />
-      <window_info active="true" anchor="bottom" id="Terminal" order="11" visible="true" weight="0.3299363" />
+      <window_info anchor="bottom" id="Terminal" order="11" visible="true" weight="0.3299363" />
       <window_info anchor="bottom" id="Python Console" order="12" weight="0.16815287" />
       <window_info anchor="right" id="Commander" order="0" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
       <window_info anchor="right" id="SciView" order="3" />
-      <window_info anchor="right" x="0" y="0" width="304" height="677" id="Documentation" order="4" side_tool="true" visible="true" weight="0.17854519" />
+      <window_info anchor="right" x="0" y="0" width="304" height="677" id="Documentation" order="4" side_tool="true" visible="true" weight="0.23732549" />
       <window_info anchor="right" id="Database" order="5" />
     </layout>
   </component>
@@ -227,24 +249,33 @@
     <option name="LAST_COMMIT_MESSAGE" value="new changes added to a encoder layers." />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/MODULES/wikipedia_corpus.py" />
     <entry file="file://$PROJECT_DIR$/MODULES/wikipedia_corpus (1).py" />
-    <entry file="file://$PROJECT_DIR$/MODULES/bert_core.py">
+    <entry file="file://$PROJECT_DIR$/MODULES/bert_utils.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-463">
-          <caret line="182" column="18" selection-start-line="182" selection-start-column="18" selection-end-line="182" selection-end-column="18" />
+        <state relative-caret-position="-167">
+          <caret line="237" column="64" selection-start-line="237" selection-start-column="49" selection-end-line="237" selection-end-column="64" />
           <folding>
-            <element signature="e#0#23#0" expanded="true" />
+            <element signature="e#51#74#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/MODULES/bert_utils.py">
+    <entry file="file://$PROJECT_DIR$/MODULES/wikipedia_corpus.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="134">
-          <caret line="264" column="12" lean-forward="true" selection-start-line="264" selection-start-column="12" selection-end-line="264" selection-end-column="12" />
+        <state relative-caret-position="150">
+          <caret line="141" column="68" selection-start-line="141" selection-start-column="64" selection-end-line="141" selection-end-column="68" />
           <folding>
-            <element signature="e#51#74#0" expanded="true" />
+            <element signature="e#51#60#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/MODULES/bert_core.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="36">
+          <caret line="164" column="16" selection-start-line="164" selection-start-column="16" selection-end-line="164" selection-end-column="16" />
+          <folding>
+            <element signature="e#0#23#0" expanded="true" />
           </folding>
         </state>
       </provider>

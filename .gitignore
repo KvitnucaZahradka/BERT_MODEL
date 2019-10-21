@@ -4,3 +4,4 @@
 ANALYSIS/*.ipynb
 DATA/
 MODULES/.DS_STORE
+.idea

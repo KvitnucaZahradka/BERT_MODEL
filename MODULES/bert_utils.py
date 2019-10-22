@@ -13,6 +13,19 @@ import numpy as np
 
 from typing import Iterator
 
+
+# this is a global dictionary holding special tokens
+#
+# NOTE: the acronyms mean:
+# - '<EOS>' = end of the sentence
+# - '<BOS>' = beginning of sentence
+# - '<FILL>' = is the padding character
+# - '<UNK>' = is unknown token
+# - '<MASK>' = is the masking token
+
+SPECIAL_TOKENS = {'<FILL>': 0, '<UNK>': 1, '<BOS>': 2, '<EOS>': 3, '<MASK>': 4}
+
+
 def parse_and_pad(seq, max_sequence_length: int, eos_token: bool = True) -> tf.Tensor:
     """
 

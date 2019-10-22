@@ -3,7 +3,9 @@
 
 import tensorflow as tf
 import bert_utils as but
+
 from bert_utils import tf_record_batch_iterator as rec_batch
+
 import numpy as np
 
 from typing import Generator, Iterator
@@ -61,11 +63,13 @@ class BertTrain:
     """
 
     def __init__(self, path_to_tf_records: str, w2v_model: 'loaded_w2v_model', num_heads: int,
-                 n_parallel_layers: int = 6, mask=None, dropout_prob: float = 0.8, dropout: str = None,
-                 vocabulary_size: int = 20000, batch_size: int = 128, latent_space_dimension: int = 512,
-                 max_sequence_length: int = 40, learning_rate: float = 1e-3, max_grad_norm: float = 10,
-                 optimizer: str = None, number_of_rnn_in_layers: int = 1, rnn_direction:str = 'bidirectional',
-                 cuda: bool = True, time_major: bool = True):
+                 n_parallel_layers: int = 6, whole_word_mask: bool = True, dropout_prob: float = 0.8,
+                 dropout: str = None, vocabulary_size: int = 20000, batch_size: int = 128,
+                 latent_space_dimension: int = 512, max_sequence_length: int = 40, learning_rate: float = 1e-3,
+                 max_grad_norm: float = 10, optimizer: str = None, number_of_rnn_in_layers: int = 1,
+                 rnn_direction: str = 'bidirectional', cuda: bool = True, time_major: bool = True):
+
+        self._path_to_data = path_to_tf_records
 
         self._N_parallel_layers = n_parallel_layers
         self._w2v_model = w2v_model
@@ -85,7 +89,7 @@ class BertTrain:
         self._time_major = time_major
 
         self._direction = rnn_direction
-        self._mask = mask
+        self._whole_word_mask = whole_word_mask
         self._dropout_prob = dropout_prob
 
         self._optimizer = optimizer
@@ -94,7 +98,8 @@ class BertTrain:
         # this holds the number of attention heads
         self._num_heads = num_heads
 
-        assert latent_space_dimension % num_heads == 0
+        assert latent_space_dimension % num_heads == 0, 'Variable `latent_space_dimension` must be mod divisible ' \
+                                                        'by variable `num_heads`.'
 
         # here you will store the individual attention layers
         self._attention_layers = defaultdict(lambda: [])
@@ -112,7 +117,8 @@ class BertTrain:
         # and it is the filling character.
 
         # below the 5 are those 5 tokens and we have sqrt(5-1)
-        special_embeddings = tf.get_variable('special_embeddings', shape=(5, self._vector_embedding_dimension),
+        special_embeddings = tf.get_variable('special_embeddings', shape=(len(but.SPECIAL_TOKENS),
+                                                                          self._vector_embedding_dimension),
                                              initializer=tf.initializers.random_uniform(-np.sqrt(4), np.sqrt(4)),
                                              trainable=True)
 
@@ -210,7 +216,7 @@ class BertTrain:
         """
         # -- defaults --
         _mask_percentage = kwargs.get('mask_percentage', 0.2)
-        _replacement = kwargs.get('replacement', 4)
+        _replacement = kwargs.get('replacement', but.SPECIAL_TOKENS['<MASK>'])
 
         # -- STEP 1 -- GET train_inputs AND forward_labels FROM ONE BATCH
         # ITERATOR
@@ -220,7 +226,7 @@ class BertTrain:
 
         # -- STEP 2 -- APPLY THE ENCODER MASK
         # ?? only at the time of training not inference ??
-        if train:
+        if train and self._whole_word_mask:
             train_inputs = self._encoder_mask(train_inputs, mask_percentage=_mask_percentage, replacement=_replacement)
 
         # -- STEP 2 -- SIMILARLY TO SKIP THOUGHT, HERE ENCODE THE train_inputs
@@ -285,7 +291,40 @@ class BertTrain:
         # -- STEP 10 -- put it together into one tensor
         return tf.stack(_resulting_list), fw_labels
 
-    def _bert_sentence_decoder(self, forward_labels: tf.Tensor, layer_name: str = 'bert_sentence_decoder') -> tf.Tensor:
+    def _bert_sentence_decoder(self, encoder_out: tf.Tensor, forward_labels: tf.Tensor,
+                               layer_name: str = 'bert_sentence_decoder') -> tf.Tensor:
+        """
+
+        Parameters
+        ----------
+        encoder_out: tf.Tensor
+            is the output of the encoder part of the neural network.
+
+        forward_labels: tf.Tensor
+
+        layer_name
+
+        Returns
+        -------
+
+        """
+
+        # -- step 0 -- target sentence encoding
+        # WE MUST SHIFT THE `forward_labels` BY THE TOKEN `<BOS>`
+        # THEN WE NEED TO DO THE NORMAL ENCODING OF SHIFTED TARGET SENTENCE
+        # more here : https://medium.com/dissecting-bert/dissecting-bert-appendix-the-decoder-3b86f66b0e5f
+        # i.e. steps 1 && 2
+
+        # -- step 1 -- causality masking
+        # THEN DO ANOTHER TYPE OF MASKING, YOU MUST MASK 1/2 of the calculated matrix by -np.inf
+        # this ensures causality,
+
+
+        # -- step 2 -- first multi head attention (similar to what I have before)
+
+
+        # -- step 3 -- another multi headt attention but with encoder query
+
         raise NotImplementedError()
 
     def _positional_encode_sequences(self, train_inputs: tf.Tensor) -> tf.Tensor:
@@ -409,7 +448,7 @@ class BertTrain:
         ----------
         name: str
             is the name of this attention layer
-            this layer's unormalized probabilities are stored in the instance memmory
+            this layer's unormalized probabilities are stored in the instance memory
         query
 
         key: tf.Tensor

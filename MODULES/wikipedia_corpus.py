@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-Created on Sat Jun 29 2019
+Created on 2019 October 22 22:14:14 (EST)
 
-@author: polny
+@author: KanExtension
 """
+
 import re
 # from _pytest.monkeypatch import MonkeyPatch
 import numpy as np
@@ -31,8 +32,7 @@ def wiki_corpus_iterator(path_to_wiki_zipped_corpus: str) -> 'iter':
     gensim.utils.PAT_ALPHABETIC = PAT_ALPHABETIC
 
     # create 'WikiCorpus' instance
-    wiki = gensim.corpora.WikiCorpus(path_to_wiki_zipped_corpus,
-                                     lemmatize=False, token_min_len=2)
+    wiki = gensim.corpora.WikiCorpus(path_to_wiki_zipped_corpus, lemmatize=False, token_min_len=2)
 
     # also set that you want the wikipedia metadata
     wiki.metadata = True
@@ -45,18 +45,15 @@ def wiki_corpus_iterator(path_to_wiki_zipped_corpus: str) -> 'iter':
     return enumerate(wiki.get_texts())
 
 
-def produce_tf_sequence_w2v(sentence: str,
-                            gensim_w2v_model: 'loaded gensim w2v model',
-                            maximum_sentence_length: int = 40,
-                            maximum_vocabulary_size: int = 20000,
-                            clean: bool = True,
+def produce_tf_sequence_w2v(sentence: str, gensim_w2v_model: 'loaded gensim w2v model',
+                            maximum_sentence_length: int = 40, maximum_vocabulary_size: int = 20000, clean: bool = True,
                             **kwargs) -> 'tf sequence example':
     """
     ADD DOCSTRING
 
     this function takes NAIVELY just firs 20000 words (not ordered by frequencies)
 
-    # TO DO::: in the future; using quargs; add a dictionary of most used words
+    # TO DO::: in the future; using kwargs; add a dictionary of most used words
     using the underlying corpus
 
     Parametres
@@ -82,9 +79,7 @@ def produce_tf_sequence_w2v(sentence: str,
     _clean_sentence = kwargs.get('clean_sentence_function', None)
 
     if _clean_sentence is None:
-        def _clean_sentence(sentence): return re.sub(r'[ ]+', ' ',
-                                                     re.sub(r'[^A-Za-z0-9]', ' ',
-                                                            sentence)).strip()
+        def _clean_sentence(sentence): return re.sub(r'[ ]+', ' ', re.sub(r'[^A-Za-z0-9]', ' ', sentence)).strip()
 
     # get ordered list of word indices of the gensim model by the usage
     # in the underlying corpus
@@ -154,13 +149,9 @@ def produce_tf_sequence_w2v(sentence: str,
     return seq
 
 
-def dump_wiki_text_as_tf_records(path_to_wiki_zipped_corpus: str,
-                                 path_to_gensim_model: str,
-                                 path_to_save_tf_records: str,
-                                 name_to_save_tf_record: str = 'data.tfrecords',
-                                 verbose: bool = True,
-                                 use_w2v_orders: bool = False,
-                                 **kwargs):
+def dump_wiki_text_as_tf_records(path_to_wiki_zipped_corpus: str, path_to_gensim_model: str,
+                                 path_to_save_tf_records: str, name_to_save_tf_record: str = 'data.tfrecords',
+                                 verbose: bool = True, use_w2v_orders: bool = False, **kwargs):
     """
     this function takes the wikipedia corpus and dumps it into the
     tf record format; the tf record format is ready to be ingested by TF.

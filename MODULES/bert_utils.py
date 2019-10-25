@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-Created on Sat Jun 29 2019
+Created on 2019 October 22 22:11:14 (EST)
 
-@author: polny
+@author: KanExtension
 """
 
 import tensorflow as tf
@@ -24,6 +24,22 @@ from typing import Iterator
 # - '<MASK>' = is the masking token
 
 SPECIAL_TOKENS = {'<FILL>': 0, '<UNK>': 1, '<BOS>': 2, '<EOS>': 3, '<MASK>': 4}
+
+
+def shape(tensor: tf.Tensor) -> tuple:
+    """
+
+    Parameters
+    ----------
+    tensor: tf.Tensor
+
+    Returns
+    -------
+    tuple
+
+    """
+    s = tensor.get_shape()
+    return tuple([s[i].value for i in range(0, len(s))])
 
 
 def parse_and_pad(seq, max_sequence_length: int, eos_token: bool = True) -> tf.Tensor:
@@ -48,9 +64,9 @@ def parse_and_pad(seq, max_sequence_length: int, eos_token: bool = True) -> tf.T
     t = sequence_parsed['tokens']
 
     if eos_token:
-        t = tf.pad(t, [[0, 1]], constant_values=3)
+        t = tf.pad(t, [[0, 1]], constant_values=SPECIAL_TOKENS['<EOS>'])
 
-    return tf.pad(t, [[0, max_sequence_length - tf.shape(t)[0]]])
+    return tf.pad(t, [[0, max_sequence_length - tf.shape(t)[0]]], constant_values=SPECIAL_TOKENS['<FILL>'])
 
 
 def tf_record_iterator(filename: str, max_sequence_length: int = 40, pad: bool = True, eos_token: bool = True,
@@ -128,8 +144,7 @@ def tf_record_batch_iterator(filename: str, batch_size: int = 48, sub_slice_dime
     # map `parse_and_pad` if requested
     # only if you want to pad sequence; use max_sequence_length and eos token.
     if pad:
-        dataset = dataset.map(lambda t, sent_length=max_sequence_length,
-                              eos_token=eos_token:
+        dataset = dataset.map(lambda t, sent_length=max_sequence_length, eos_token=eos_token:
                               parse_and_pad(t, sent_length, eos_token))
 
     # now, apply the sliding window batch
@@ -153,8 +168,8 @@ def tf_record_batch_iterator(filename: str, batch_size: int = 48, sub_slice_dime
     #
     # more about above `stride` and `shift` parameters here:
     # https://www.tensorflow.org/api_docs/python/tf/contrib/data/sliding_window_batch
-    dataset = dataset.window(size=batch_size, shift=None, stride=1,\
-                            drop_remainder=True).flat_map(lambda x: x.batch(sub_slice_dimension))
+    dataset = dataset.window(size=batch_size, shift=None, stride=1,
+                             drop_remainder=True).flat_map(lambda x: x.batch(sub_slice_dimension))
 
     dataset = dataset.batch(batch_size)
 
@@ -177,7 +192,7 @@ def tf_record_batch_iterator(filename: str, batch_size: int = 48, sub_slice_dime
         #dataset = dataset.map(lambda x: tf.transpose(x, perm=[2, 0, 1]))
 
     # prefetching means you are moving this data into the ram, or another fast
-    # memory. We are prefatching by 1; just because we have 1 batch that is gonna
+    # memory. We are pre-fatching by 1; just because we have 1 batch that is gonna
     # be eaten by the training algorithm.
     dataset = dataset.prefetch(1)
 

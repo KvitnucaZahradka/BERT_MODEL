@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+Created on 2019 October 22 22:11:14 (EST)
+
+@author: KanExtension
+"""
+
 import tensorflow as tf
 import bert_utils as but
 
@@ -314,11 +320,18 @@ class BertTrain:
         # THEN WE NEED TO DO THE NORMAL ENCODING OF SHIFTED TARGET SENTENCE
         # more here : https://medium.com/dissecting-bert/dissecting-bert-appendix-the-decoder-3b86f66b0e5f
         # i.e. steps 1 && 2
+        fw_labels = tf.pad(forward_labels, [[1, 0], [0, 0]], constant_values=but.SPECIAL_TOKENS['<BOS>'])
+
+        # -- step 1 -- SIMILARLY TO SKIP THOUGHT, HERE ENCODE THE train_inputs
+
+        # we will use the local layer, so we can do the skip connection
+
+        # question is whether you do not need to normalize this somehow specially??? so the addition
+        _encoded_sequences_positional = self._positional_encode_sequences(fw_labels)
 
         # -- step 1 -- causality masking
         # THEN DO ANOTHER TYPE OF MASKING, YOU MUST MASK 1/2 of the calculated matrix by -np.inf
         # this ensures causality,
-
 
         # -- step 2 -- first multi head attention (similar to what I have before)
 
@@ -379,6 +392,9 @@ class BertTrain:
             #
             # note, in our case we are taking the part [0] because we want all results
             # and we want to put the self-attention mechanism
+            #
+            # IF YOU WANT TO KNOW ABOUT THE DIMENSIONS (i.e. [max_sequence_length, batch_size, embedding_size] )see here:
+            # https://stackoverflow.com/questions/49183538/simple-example-of-cudnngru-based-rnn-implementation-in-tensorflow
             if self._time_major:
                 _encoder_out = tf.contrib.cudnn_rnn.CudnnGRU(num_layers=self._number_rnn_in_layers,
                                                              num_units=self._latent_space_dimension,
@@ -441,15 +457,16 @@ class BertTrain:
             raise NotImplementedError
 
     def _attention(self, name: str, query: tf.Tensor, key: tf.Tensor, value: tf.Tensor,
-                   dropout: bool) -> (tf.Tensor, tf.Tensor):
+                   dropout: bool, bert_mask: bool = False) -> (tf.Tensor, tf.Tensor):
         """
 
         Parameters
         ----------
         name: str
             is the name of this attention layer
-            this layer's unormalized probabilities are stored in the instance memory
-        query
+            this layer's un-normalized probabilities are stored in the instance memory
+
+        query: tf.Tensor
 
         key: tf.Tensor
 
@@ -472,6 +489,16 @@ class BertTrain:
 
         # -- step 2 -- calculate scores
         _scores = (query @ tf.transpose(key, perm=[0, 2, 1])) / tf.math.sqrt(_d_k)
+
+        # -- step 3 -- add mask if requested; the mask should just ket rid of the
+        # upper triangular matrix
+        if bert_mask:
+
+            # this is a mask that picks the lower triangular matrix
+            _causal_filter = tf.constant(np.tril(np.ones(but.shape(_scores))) \
+                                         + np.triu(np.ones(but.shape(_scores)) * (-np.inf), k=1), dtype=tf.float64)
+
+            _scores = tf.cast(tf.multiply(tf.cast(_scores, dtype=tf.float64), _causal_filter), dtype=tf.float32)
 
         # calculate attention unorm. probability
         # and upload it to the instance memory
@@ -578,7 +605,7 @@ class BertTrain:
 
         # print('---> ', _multi_h_attention.shape)
 
-        # now the concatenated tonsors should have dimensions
+        # now the concatenated tensors should have dimensions
         # (_batch_size, _d_time, _d_model)
 
         # -- step 3 -- multiply by the output matrix

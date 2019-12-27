@@ -286,7 +286,6 @@ class BertTrain:
             _encoded = tf.contrib.layers.layer_norm(_encoded_dense)
 
             # TO DO
-            #?? should not this be only in the case of training???
             _encoded = tf.nn.dropout(_encoded, keep_prob=self._dropout_prob)
 
             _encoded = tf.add(_encoded_dense, _encoded)
@@ -298,7 +297,7 @@ class BertTrain:
         return tf.stack(_resulting_list), fw_labels
 
     def _bert_sentence_decoder(self, encoder_out: tf.Tensor, forward_labels: tf.Tensor,
-                               layer_name: str = 'bert_sentence_decoder') -> tf.Tensor:
+                               batch_size: int, layer_name: str = 'bert_sentence_decoder') -> tf.Tensor:
         """
 
         Parameters
@@ -329,14 +328,87 @@ class BertTrain:
         # question is whether you do not need to normalize this somehow specially??? so the addition
         _encoded_sequences_positional = self._positional_encode_sequences(fw_labels)
 
-        # -- step 1 -- causality masking
-        # THEN DO ANOTHER TYPE OF MASKING, YOU MUST MASK 1/2 of the calculated matrix by -np.inf
         # this ensures causality,
+        # we must clone the given layer N times
+        _resulting_list = []
 
-        # -- step 2 -- first multi head attention (similar to what I have before)
+        for _ind in range(self._N_parallel_layers):
+            # ?? I am not sure about the usage of identity here ???
+            _input_x = tf.identity(_encoded_sequences_positional, name="{}_{}".format(layer_name, _ind))
+
+            # -- step 1 -- causality masking
+            # THEN DO ANOTHER TYPE OF MASKING, YOU MUST MASK 1/2 of the calculated matrix by -np.inf
+            # this is done by `bert_mask` = True
+            #  multi head attention (similar to what I have before)
+            _encoded_forward_sequences_multi_head = \
+                self._multi_head_attention(name_of_attention='{}_{}'.format(layer_name, _ind), query=_input_x,
+                                           key=_input_x, value=_input_x, num_heads=self._num_heads,
+                                           batch_size=batch_size, d_model=self._latent_space_dimension,
+                                           bert_mask=True, attention_layer_name='decoder_attentions_causal')
 
 
-        # -- step 3 -- another multi headt attention but with encoder query
+            # -- step 2 -- APPLY LAYER NORM TO MULTI HEAD SUBLAYER
+            _encoded_forward_sequences_multi_head = tf.contrib.layers.layer_norm(_encoded_forward_sequences_multi_head)
+
+            # -- STEP 3 -- APPLY DROPOUT
+            _encoded_forward_sequences_multi_head = tf.nn.dropout(_encoded_forward_sequences_multi_head,
+                                                          keep_prob=self._dropout_prob)
+
+            # -- STEP 4 -- ADD THE RESIDUAL CONNECTION
+            _encoded_forward_sequences_multi_head_causal = tf.add(_encoded_sequences_positional,
+                                                                  _encoded_forward_sequences_multi_head)
+
+            _encoded_forward_sequences_multi_head = \
+                self._multi_head_attention(name_of_attention='{}_{}'.format(layer_name, _ind), query=encoder_out,
+                                           key=encoder_out, value=_encoded_forward_sequences_multi_head_causal,
+                                           num_heads=self._num_heads, batch_size=batch_size,
+                                           d_model=self._latent_space_dimension, bert_mask=False,
+                                           attention_layer_name='decoder_attentions')
+
+            # -- step 2 -- APPLY LAYER NORM TO MULTI HEAD SUBLAYER
+            _encoded_forward_sequences_multi_head = tf.contrib.layers.layer_norm(_encoded_forward_sequences_multi_head)
+
+            # -- STEP 3 -- APPLY DROPOUT
+            _encoded_forward_sequences_multi_head = tf.nn.dropout(_encoded_forward_sequences_multi_head,
+                                                                  keep_prob=self._dropout_prob)
+
+            # -- STEP 4 -- ADD THE RESIDUAL CONNECTION
+            _encoded_forward_sequences_multi_head = tf.add(_encoded_forward_sequences_multi_head_causal,
+                                                           _encoded_forward_sequences_multi_head)
+
+            # TODO: CHECK THE DIMENSIONS OF THE FORWARD LAYER
+
+            # -- STEP 7 -- ADD RELU FULLY CONNECTED NN (d_model::512 --> d_inner:: 4*512 = 2048)
+            # and then add linear 2048 --> 512
+            # maybe there is a better way how to do that; technically this should be
+            # `Position-wise Feed-Forward Networks` as in :
+            # http://nlp.seas.harvard.edu/2018/04/03/attention.html#applications-of-attention-in-our-model
+            # but for now this should be ok
+            # we fix the inner dimension to be 4*hidden_dim = 512
+            _encoded_dense = tf.layers.dense(_encoded_forward_sequences_multi_head, self._latent_space_dimension * 4,
+                                             activation=tf.nn.relu, kernel_initializer='glorot_uniform_initializer')
+
+            # ?? maybe only at the time of training ??
+            _encoded_dense = tf.layers.dense(_encoded_dense, self._latent_space_dimension, activation=None,
+                                             kernel_initializer=tf.contrib.layers.xavier_initializer())
+
+            # -- STEP 8 -- REPEAT NORM AND DROPOUT AND SKIP CONNECTION LAYER
+            _encoded = tf.contrib.layers.layer_norm(_encoded_dense)
+
+            # TO DO
+            _encoded = tf.nn.dropout(_encoded, keep_prob=self._dropout_prob)
+
+            _encoded = tf.add(_encoded_dense, _encoded)
+
+            # -- STEP 9 -- PUT INTO THE CONTAINER
+            _resulting_list += [_encoded]
+
+        # -- STEP ?? -- STACK THEM
+        _final_stack = tf.stack(_resulting_list)
+
+        # -- STEP ?? -- DO LINEAR
+
+        # -- STEP ?? -- DO SOFTMAX
 
         raise NotImplementedError()
 
@@ -515,8 +587,8 @@ class BertTrain:
         return _att_u_probability @ value
 
     def _multi_head_attention(self, name_of_attention: str, query: tf.Tensor, key: tf.Tensor, value: tf.Tensor,
-                              num_heads: int, batch_size: int, d_model: int,
-                              dropout: bool = None) -> (tf.Tensor, tf.Tensor):
+                              num_heads: int, batch_size: int, d_model: int, dropout: bool = None,
+                              bert_mask: bool = False, **kwargs) -> (tf.Tensor, tf.Tensor):
         """
         Parameters
         ----------
@@ -527,13 +599,18 @@ class BertTrain:
 
         dropout
 
+        **kwargs
+            attention_layer_name: str
+                --default-- `encoder_attentions`, is the given attention layer name
 
+        Notes
+        -----
         note, we want to have: d_model % num_heads == 0
         in this implementation we are setting: d_q == d_k == d_v == d_model/num_heads
 
         """
         # -- fun-globals --
-        _attention_layer_name = 'encoder_attentions'
+        _attention_layer_name = kwargs.get('attention_layer_name', 'encoder_attentions')
 
         # -- step 0 -- calculate the effective `head dimension`
 
@@ -585,8 +662,8 @@ class BertTrain:
         # NOTE we must STACK THEM AS ABOVE; since the tf.map_fn ONLY UNSTACK BY THE 0-th DIMENSION
         # !!! also the mask here is problematic, since in the function self._attention I do not have parameter mask
         _attentions = tf.map_fn(lambda W: self._attention(_attention_layer_name, query @ W[0], key @ W[1], value @ W[2],
-                                                          dropout), tf.stack(list(zip(W_i_Q, W_i_K, W_i_V))),
-                                dtype=tf.float32)
+                                                          dropout, bert_mask=bert_mask),
+                                tf.stack(list(zip(W_i_Q, W_i_K, W_i_V))), dtype=tf.float32)
 
         # query 33, 42, 512
         # W[0] 33, 512, 64

@@ -1,8 +1,11 @@
 .DS_Store
 .cache
 .ipynb_checkpoints/
-ANALYSIS/*.ipynb
+ANALYSIS
+
 DATA/
+MODULES/__pycache__
 MODULES/.DS_STORE
 .idea
+*.pyc
 __pycache__

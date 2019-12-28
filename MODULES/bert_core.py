@@ -14,7 +14,7 @@ from bert_utils import tf_record_batch_iterator as rec_batch
 
 import numpy as np
 
-from typing import Generator, Iterator
+from typing import Generator, Iterator, Tuple
 from collections import defaultdict
 
 
@@ -28,6 +28,9 @@ class BertTrain:
         is a loaded w2v_model
 
     vocabulary_size:int
+        this should be a original vocabulary size (i.e. for example 20000 words) BUT + extra tokens
+        for example we need to add + 5 because we used <EOS> = 3; <BOS> = 2, <UNK> = 1, <FILL> = 0, <MASK> = 4
+        into the normal indexing (see `produce_tf_sequence_w2v` from `data_preparation.py`)
 
     n_parallel_layers: int
         is the number of parallel plates the encoder and decoder lives on, default is 6
@@ -57,8 +60,8 @@ class BertTrain:
 
     mask
         is either None: in that case we are not masking anything
-        or can tensor, holding indices we are masking on input
-        or can be 0< float <1 in which cas it tells us what percentage of
+        or can be a tensor, holding indices we are masking on input
+        or can be 0< float <1 in which case it tells us what percentage of
         indices we should randomly mask in the input tensor.
         for mask; we use the <MASK> index == 4
 
@@ -192,7 +195,7 @@ class BertTrain:
         return tf.map_fn(lambda in_tensor: _mask_application(in_tensor), input_tensor, dtype=tf.int32)
 
     def _bert_sentence_encoder(self, one_data_batch_iter: Iterator[tf.Tensor], batch_size: int, train: bool = True,
-                               layer_name: str = 'bert_sentence_encoder', **kwargs) -> (tf.Tensor, tf.Tensor):
+                               layer_name: str = 'bert_sentence_encoder', **kwargs) -> Tuple[tf.Tensor, tf.Tensor]:
         """
         ADD DOCSTRING
 
@@ -224,27 +227,24 @@ class BertTrain:
         _mask_percentage = kwargs.get('mask_percentage', 0.2)
         _replacement = kwargs.get('replacement', but.SPECIAL_TOKENS['<MASK>'])
 
-        # -- STEP 1 -- GET train_inputs AND forward_labels FROM ONE BATCH
-        # ITERATOR
+        # -- step 0 -- get train_inputs AND forward_labels from one batch
 
         # get train_inputs and fw_labels
         train_inputs, fw_labels = tf.unstack(one_data_batch_iter, num=2)
 
-        # -- STEP 2 -- APPLY THE ENCODER MASK
+        # -- step 1 -- apply the encoder mask
         # ?? only at the time of training not inference ??
         if train and self._whole_word_mask:
             train_inputs = self._encoder_mask(train_inputs, mask_percentage=_mask_percentage, replacement=_replacement)
 
-        # -- STEP 2 -- SIMILARLY TO SKIP THOUGHT, HERE ENCODE THE train_inputs
-        # BUT UNLIKE THE skip though, HERE YOU MUST RETURN ALL EMBEDDINGS
-        # YOU ARE GETTING AS YOU ARE EMBEDDING THE TRAIN INPUTS
+        # -- step 2 -- similarly to skip thought, here encode the train_inputs
+        # but unlike the skip though, here you must return all embeddings
+        # you are getting as you are embedding the train inputs
 
         # we will use the local layer, so we can do the skip connection
-
-        # question is whether you do not need to normalize this somehow specially??? so the addition
         _encoded_sequences_positional = self._positional_encode_sequences(train_inputs)
 
-        # -- STEP 3 -- CLONE MULTI HEAD LAYER
+        # -- step 3 -- clone multi head layer
         # we must clone the given layer N times
         _resulting_list = []
 
@@ -253,22 +253,26 @@ class BertTrain:
             # ?? I am not sure about the usage of identity here ???
             _input_x = tf.identity(_encoded_sequences_positional, name="{}_{}".format(layer_name, _ind))
 
-            # -- STEP 3 -- DO THE MULTI-HEAD ATTENTION
+            # -- step 3 -- do the multi-head attention
             _encoded_sequences_multi_head = \
                 self._multi_head_attention(name_of_attention='{}_{}'.format(layer_name, _ind), query=_input_x,
                                            key=_input_x, value=_input_x, num_heads=self._num_heads,
                                            batch_size=batch_size, d_model=self._latent_space_dimension)
 
-            # -- STEP 4 -- APPLY LAYER NORM TO MULTI HEAD SUBLAYER
+            # -- step 4 -- apply layer norm to multi head sublayer
             _encoded_sequences_multi_head = tf.contrib.layers.layer_norm(_encoded_sequences_multi_head)
 
-            # -- STEP 5 -- APPLY DROPOUT
-            _encoded_sequences_multi_head = tf.nn.dropout(_encoded_sequences_multi_head, keep_prob=self._dropout_prob)
+            # -- step 5 -- apply dropout
+            _encoded_sequences_multi_head = tf.nn.dropout(_encoded_sequences_multi_head,
+                                                          keep_prob=self._dropout_prob,
+                                                          name='encoder plate dropout 0')
 
-            # -- STEP 6 -- ADD THE RESIDUAL CONNECTION
-            _encoded_sequences_multi_head = tf.add(_encoded_sequences_positional, _encoded_sequences_multi_head)
+            # -- step 6 -- add the residual connection
+            _encoded_sequences_multi_head = tf.add(_encoded_sequences_positional,
+                                                   _encoded_sequences_multi_head,
+                                                   name='encoder plate residual connection 0')
 
-            # -- STEP 7 -- ADD RELU FULLY CONNECTED NN (d_model::512 --> d_inner:: 4*512 = 2048)
+            # -- step 7 -- add relu fully connected nn (d_model::512 --> d_inner:: 4*512 = 2048)
             # and then add linear 2048 --> 512
             # maybe there is a better way how to do that; technically this should be
             # `Position-wise Feed-Forward Networks` as in :
@@ -276,25 +280,25 @@ class BertTrain:
             # but for now this should be ok
             # we fix the inner dimension to be 4*hidden_dim = 512
             _encoded_dense = tf.layers.dense(_encoded_sequences_multi_head, self._latent_space_dimension*4,
-                                             activation=tf.nn.relu, kernel_initializer='glorot_uniform_initializer')
+                                             activation=tf.nn.relu, kernel_initializer='glorot_uniform_initializer',
+                                             name='encoder plate relu 512 -> 2048')
 
-            # ?? maybe only at the time of training ??
             _encoded_dense = tf.layers.dense(_encoded_dense, self._latent_space_dimension, activation=None,
-                                             kernel_initializer=tf.contrib.layers.xavier_initializer())
+                                             kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                             name='encoder plate linear 2048 -> 512')
 
-            # -- STEP 8 -- REPEAT NORM AND DROPOUT AND SKIP CONNECTION LAYER
+            # -- step 8 -- repeat norm and dropout and skip connection layer
             _encoded = tf.contrib.layers.layer_norm(_encoded_dense)
+            _encoded = tf.nn.dropout(_encoded, keep_prob=self._dropout_prob, name='encoder plate dropout 1')
 
-            # TO DO
-            _encoded = tf.nn.dropout(_encoded, keep_prob=self._dropout_prob)
+            # add residual connection
+            _encoded = tf.add(_encoded_dense, _encoded, name='encoder plate residual connection 1')
 
-            _encoded = tf.add(_encoded_dense, _encoded)
-
-            # -- STEP 9 -- PUT INTO THE CONTAINER
+            # -- step 9 -- put it into the container
             _resulting_list += [_encoded]
 
-        # -- STEP 10 -- put it together into one tensor
-        return tf.stack(_resulting_list), fw_labels
+        # -- step 10 -- put it together into one tensor
+        return tf.stack(_resulting_list, name='encoder stack layer'), fw_labels
 
     def _bert_sentence_decoder(self, encoder_out: tf.Tensor, forward_labels: tf.Tensor,
                                batch_size: int, layer_name: str = 'bert_sentence_decoder') -> tf.Tensor:
@@ -346,17 +350,18 @@ class BertTrain:
                                            batch_size=batch_size, d_model=self._latent_space_dimension,
                                            bert_mask=True, attention_layer_name='decoder_attentions_causal')
 
-
             # -- step 2 -- APPLY LAYER NORM TO MULTI HEAD SUBLAYER
             _encoded_forward_sequences_multi_head = tf.contrib.layers.layer_norm(_encoded_forward_sequences_multi_head)
 
             # -- STEP 3 -- APPLY DROPOUT
             _encoded_forward_sequences_multi_head = tf.nn.dropout(_encoded_forward_sequences_multi_head,
-                                                          keep_prob=self._dropout_prob)
+                                                                  keep_prob=self._dropout_prob,
+                                                                  name='decoder dropout 0')
 
             # -- STEP 4 -- ADD THE RESIDUAL CONNECTION
             _encoded_forward_sequences_multi_head_causal = tf.add(_encoded_sequences_positional,
-                                                                  _encoded_forward_sequences_multi_head)
+                                                                  _encoded_forward_sequences_multi_head,
+                                                                  name='decoder plate residual connection 0')
 
             _encoded_forward_sequences_multi_head = \
                 self._multi_head_attention(name_of_attention='{}_{}'.format(layer_name, _ind), query=encoder_out,
@@ -365,20 +370,20 @@ class BertTrain:
                                            d_model=self._latent_space_dimension, bert_mask=False,
                                            attention_layer_name='decoder_attentions')
 
-            # -- step 2 -- APPLY LAYER NORM TO MULTI HEAD SUBLAYER
+            # -- step 5 -- apply layer norm to multi head sublayer
             _encoded_forward_sequences_multi_head = tf.contrib.layers.layer_norm(_encoded_forward_sequences_multi_head)
 
-            # -- STEP 3 -- APPLY DROPOUT
+            # -- step 6 -- apply dropout
             _encoded_forward_sequences_multi_head = tf.nn.dropout(_encoded_forward_sequences_multi_head,
-                                                                  keep_prob=self._dropout_prob)
+                                                                  keep_prob=self._dropout_prob,
+                                                                  name='decoder plate dropout 1')
 
-            # -- STEP 4 -- ADD THE RESIDUAL CONNECTION
+            # -- step 7 -- add the residual connection
             _encoded_forward_sequences_multi_head = tf.add(_encoded_forward_sequences_multi_head_causal,
-                                                           _encoded_forward_sequences_multi_head)
+                                                           _encoded_forward_sequences_multi_head,
+                                                           name='decoder plate residual connection 1')
 
-            # TODO: CHECK THE DIMENSIONS OF THE FORWARD LAYER
-
-            # -- STEP 7 -- ADD RELU FULLY CONNECTED NN (d_model::512 --> d_inner:: 4*512 = 2048)
+            # -- step 8 -- add relu fully connected nn (d_model::512 --> d_inner:: 4*512 = 2048)
             # and then add linear 2048 --> 512
             # maybe there is a better way how to do that; technically this should be
             # `Position-wise Feed-Forward Networks` as in :
@@ -386,31 +391,33 @@ class BertTrain:
             # but for now this should be ok
             # we fix the inner dimension to be 4*hidden_dim = 512
             _encoded_dense = tf.layers.dense(_encoded_forward_sequences_multi_head, self._latent_space_dimension * 4,
-                                             activation=tf.nn.relu, kernel_initializer='glorot_uniform_initializer')
+                                             activation=tf.nn.relu, kernel_initializer='glorot_uniform_initializer',
+                                             name='decoder plate relu 512 -> 2048')
 
-            # ?? maybe only at the time of training ??
             _encoded_dense = tf.layers.dense(_encoded_dense, self._latent_space_dimension, activation=None,
-                                             kernel_initializer=tf.contrib.layers.xavier_initializer())
+                                             kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                             name='decoder plate linear 2048 -> 512')
 
-            # -- STEP 8 -- REPEAT NORM AND DROPOUT AND SKIP CONNECTION LAYER
+            # -- step 9 -- repeat norm and dropout and skip connection layer
             _encoded = tf.contrib.layers.layer_norm(_encoded_dense)
 
-            # TO DO
             _encoded = tf.nn.dropout(_encoded, keep_prob=self._dropout_prob)
+            _encoded = tf.add(_encoded_dense, _encoded, name='decoder plate skip connection')
 
-            _encoded = tf.add(_encoded_dense, _encoded)
-
-            # -- STEP 9 -- PUT INTO THE CONTAINER
+            # -- step 10 -- put into the container
             _resulting_list += [_encoded]
 
-        # -- STEP ?? -- STACK THEM
-        _final_stack = tf.stack(_resulting_list)
+        # -- step 11 -- stack them
+        _final_stack = tf.stack(_resulting_list, name='decoder stack layer')
 
-        # -- STEP ?? -- DO LINEAR
+        # -- step 12 -- final `softmax` layer to the extended dictionary
+        # we must end use the shape of the `self._embeddings.shape` the reason is that we have the extra tokens
+        # so our dictionary is a bit bigger (by 5 members, see `SPECIAL_TOKENS`)
+        _final_stack = tf.layers.dense(_final_stack, but.shape(self._embeddings)[0], activation=tf.nn.softmax,
+                                       kernel_initializer=tf.contrib.layers.xavier_initializer(),
+                                       name='final decoder softmax layer')
 
-        # -- STEP ?? -- DO SOFTMAX
-
-        raise NotImplementedError()
+        return _final_stack
 
     def _positional_encode_sequences(self, train_inputs: tf.Tensor) -> tf.Tensor:
         """
@@ -567,13 +574,12 @@ class BertTrain:
         if bert_mask:
 
             # this is a mask that picks the lower triangular matrix
-            _causal_filter = tf.constant(np.tril(np.ones(but.shape(_scores))) \
+            _causal_filter = tf.constant(np.tril(np.ones(but.shape(_scores)))
                                          + np.triu(np.ones(but.shape(_scores)) * (-np.inf), k=1), dtype=tf.float64)
 
             _scores = tf.cast(tf.multiply(tf.cast(_scores, dtype=tf.float64), _causal_filter), dtype=tf.float32)
 
-        # calculate attention unorm. probability
-        # and upload it to the instance memory
+        # calculate attention un-norm. probability AND upload it to the instance memory.
         _att_u_probability = tf.nn.softmax(_scores, axis=-1, name=name)
 
         # is this upload correct and doing any good?
@@ -671,7 +677,7 @@ class BertTrain:
         # print('---> ', (query@W_i_Q[0]).shape)
         # print('---> ', _attention(query@W_i_Q[0], key@W_i_K[0], value@W_i_V[0], mask, dropout)[0].shape)
 
-        # ??? i am not sure whether this is the best appropach ???
+        # ??? i am not sure whether this is the best approach ???
         # _self_attentions = list(map(lambda x: x[-1], _attentions_X))
         # _attentions =  list(map(lambda x: x[0], _attentions_X))
 

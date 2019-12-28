@@ -187,7 +187,7 @@ class BertTrain:
         _slice_shape = (self._latent_space_dimension, self._max_sequence_length)
 
         # -- step 1 -- create the function you want to apply over the batch
-        _mask_application = lambda in_tensor: but.apply_random_fill_mask(in_tenso=in_tensor,
+        _mask_application = lambda in_tensor: but.apply_random_fill_mask(in_tensor=in_tensor,
                                                                          in_tensor_shape=_slice_shape,
                                                                          replacement=replacement,
                                                                          replacement_rate=mask_percentage)

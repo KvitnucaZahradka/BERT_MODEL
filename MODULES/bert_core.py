@@ -594,7 +594,7 @@ class BertTrain:
 
     def _multi_head_attention(self, name_of_attention: str, query: tf.Tensor, key: tf.Tensor, value: tf.Tensor,
                               num_heads: int, batch_size: int, d_model: int, dropout: bool = None,
-                              bert_mask: bool = False, **kwargs) -> (tf.Tensor, tf.Tensor):
+                              bert_mask: bool = False, **kwargs) -> tf.Tensor:
         """
         Parameters
         ----------
@@ -608,6 +608,8 @@ class BertTrain:
         **kwargs
             attention_layer_name: str
                 --default-- `encoder_attentions`, is the given attention layer name
+        Returns
+        -------
 
         Notes
         -----

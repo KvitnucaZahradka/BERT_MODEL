@@ -305,4 +305,5 @@ def apply_random_fill_mask(in_tensor: tf.Tensor, in_tensor_shape: tuple, replace
     # -- get the full masking tensor --
     _masking_tensor = replacement*tf.ones_like(in_tensor)
 
-    return tf.where_v2(_masking_tensor, in_tensor, _bool_mask)
+    #return tf.where_v2(_masking_tensor, in_tensor, _bool_mask)
+    return tf.compat.where_v2(_masking_tensor, in_tensor, _bool_mask)
